@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { toast } from "sonner";
 
@@ -20,6 +21,12 @@ export interface User {
   };
 }
 
+// Internal user type that includes password and adminKey
+interface InternalUser extends User {
+  password: string;
+  adminKey?: string;
+}
+
 interface AuthContextType {
   currentUser: User | null;
   login: (email: string, password: string, adminKey?: string) => Promise<boolean>;
@@ -37,13 +44,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Mock user data
-const initialMockUsers = [
+const initialMockUsers: InternalUser[] = [
   {
     id: '1',
     name: 'Employee User',
     email: 'employee@example.com',
     password: 'employee123',
-    role: 'employee' as UserRole,
+    role: 'employee',
     teamId: 'team1',
     teamLeadId: '3',
     employeeId: 'EMP001',
@@ -61,7 +68,7 @@ const initialMockUsers = [
     email: 'hr@example.com',
     password: 'hr123',
     adminKey: 'hr-admin-key',
-    role: 'hr' as UserRole
+    role: 'hr'
   },
   {
     id: '3',
@@ -69,13 +76,13 @@ const initialMockUsers = [
     email: 'teamlead@example.com',
     password: 'teamlead123',
     adminKey: 'team-admin-key',
-    role: 'teamlead' as UserRole,
+    role: 'teamlead',
     teamId: 'team1'
   }
 ];
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [mockUsers, setMockUsers] = useState([...initialMockUsers]);
+  const [mockUsers, setMockUsers] = useState<InternalUser[]>([...initialMockUsers]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -126,12 +133,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Add a new user
   const addUser = (userData: Omit<User, "id">) => {
     const id = `${mockUsers.length + 1}`;
-    const newUser = {
+    const newUser: InternalUser = {
       id,
       ...userData,
       password: 'password123', // Default password
-      adminKey: userData.role === 'hr' ? 'hr-admin-key' : userData.role === 'teamlead' ? 'team-admin-key' : undefined
     };
+    
+    // Add adminKey only if the role is hr or teamlead
+    if (userData.role === 'hr') {
+      newUser.adminKey = 'hr-admin-key';
+    } else if (userData.role === 'teamlead') {
+      newUser.adminKey = 'team-admin-key';
+    }
     
     setMockUsers([...mockUsers, newUser]);
     return id;

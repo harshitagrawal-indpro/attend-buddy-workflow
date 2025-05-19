@@ -1,118 +1,142 @@
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import React from "react";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AttendanceRecord, AttendanceStatus } from "@/contexts/AttendanceContext";
-import { format, parseISO } from "date-fns";
+import { MapPin } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AttendanceRecord } from "@/contexts/AttendanceContext";
 
 interface AttendanceTableProps {
   records: AttendanceRecord[];
   showEmployeeName?: boolean;
-  showTeamId?: boolean;
-  showActions?: boolean;
-  onStatusChange?: (recordId: string, status: AttendanceStatus, notes?: string) => void;
 }
 
-const AttendanceTable = ({
-  records,
-  showEmployeeName = false,
-  showTeamId = false,
-  showActions = false,
-  onStatusChange,
-}: AttendanceTableProps) => {
-  const getStatusBadge = (status: AttendanceStatus) => {
+const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, showEmployeeName = false }) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "approved":
-        return <Badge className="bg-success">Present</Badge>;
-      case "rejected":
-        return <Badge variant="destructive">Absent</Badge>;
-      case "half-day":
-        return <Badge className="bg-warning">Half-day</Badge>;
+      case 'approved':
+        return 'bg-green-100 text-green-800 hover:bg-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 hover:bg-red-200';
+      case 'half-day':
+        return 'bg-orange-100 text-orange-800 hover:bg-orange-200';
       default:
-        return <Badge variant="outline">Pending</Badge>;
+        return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
   };
 
   return (
-    <div className="relative w-full overflow-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            {showEmployeeName && <TableHead>Employee</TableHead>}
-            {showTeamId && <TableHead>Team</TableHead>}
-            <TableHead>Entry Time</TableHead>
-            <TableHead>Exit Time</TableHead>
-            <TableHead>Status</TableHead>
-            {showActions && <TableHead>Actions</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {records.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={showActions ? 7 : 6} className="text-center py-8">
-                No attendance records found
+    <Table>
+      <TableCaption>Recent attendance records</TableCaption>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Date</TableHead>
+          {showEmployeeName && <TableHead>Employee</TableHead>}
+          <TableHead>Entry Time</TableHead>
+          <TableHead>Exit Time</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Location</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {records.length > 0 ? (
+          records.map((record) => (
+            <TableRow key={record.id}>
+              <TableCell>{record.date}</TableCell>
+              {showEmployeeName && <TableCell>{record.employeeName}</TableCell>}
+              <TableCell>
+                {record.entryTime || 'Not marked'}
+                {record.entryLocation && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <MapPin className="h-3 w-3 inline-block ml-1 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Lat: {record.entryLocation.lat.toFixed(6)}</p>
+                        <p>Lng: {record.entryLocation.lng.toFixed(6)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </TableCell>
+              <TableCell>
+                {record.exitTime || 'Not marked'}
+                {record.exitLocation && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <MapPin className="h-3 w-3 inline-block ml-1 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Lat: {record.exitLocation.lat.toFixed(6)}</p>
+                        <p>Lng: {record.exitLocation.lng.toFixed(6)}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className={getStatusColor(record.status)}>
+                  {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                </Badge>
+                {!record.locationVerified && record.locationReason && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <MapPin className="h-3 w-3 inline-block ml-1 text-yellow-500" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reason: {record.locationReason}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </TableCell>
+              <TableCell>
+                {record.locationVerified === undefined ? (
+                  <span className="text-gray-400">Unknown</span>
+                ) : record.locationVerified ? (
+                  <span className="text-green-500 flex items-center">
+                    <CheckMark className="h-4 w-4 mr-1" />
+                    Verified
+                  </span>
+                ) : (
+                  <span className="text-yellow-500 flex items-center">
+                    <AlertMark className="h-4 w-4 mr-1" />
+                    Not Verified
+                  </span>
+                )}
               </TableCell>
             </TableRow>
-          ) : (
-            records.map((record) => (
-              <TableRow key={record.id}>
-                <TableCell>
-                  {format(parseISO(record.date), "MMM d, yyyy")}
-                </TableCell>
-                {showEmployeeName && (
-                  <TableCell>{record.employeeName}</TableCell>
-                )}
-                {showTeamId && (
-                  <TableCell>{record.teamId || "—"}</TableCell>
-                )}
-                <TableCell>{record.entryTime || "—"}</TableCell>
-                <TableCell>{record.exitTime || "—"}</TableCell>
-                <TableCell>{getStatusBadge(record.status)}</TableCell>
-                {showActions && onStatusChange && (
-                  <TableCell>
-                    {record.status === "pending" && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => onStatusChange(record.id, "approved")}
-                          className="px-2 py-1 text-xs bg-success text-white rounded hover:bg-green-600"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => onStatusChange(record.id, "half-day")}
-                          className="px-2 py-1 text-xs bg-warning text-white rounded hover:bg-amber-600"
-                        >
-                          Half-day
-                        </button>
-                        <button
-                          onClick={() => onStatusChange(record.id, "rejected")}
-                          className="px-2 py-1 text-xs bg-destructive text-white rounded hover:bg-red-600"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                    {record.status !== "pending" && (
-                      <span className="text-sm text-muted-foreground">
-                        Status finalized
-                      </span>
-                    )}
-                  </TableCell>
-                )}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          ))
+        ) : (
+          <TableRow>
+            <TableCell colSpan={showEmployeeName ? 6 : 5} className="text-center py-8">
+              No attendance records found
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
   );
 };
+
+// Small utility components for the icons
+const CheckMark = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+
+const AlertMark = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
 
 export default AttendanceTable;
