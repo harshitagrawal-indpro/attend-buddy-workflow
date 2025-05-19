@@ -1,10 +1,9 @@
-
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { toast } from "sonner";
 
 export type UserRole = 'employee' | 'teamlead' | 'hr' | null;
 
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;
@@ -14,6 +13,11 @@ interface User {
   employeeId?: string;
   position?: string;
   phoneNumber?: string;
+  location?: {
+    lat: number;
+    lng: number;
+    address: string;
+  };
 }
 
 interface AuthContextType {
@@ -22,12 +26,18 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
+  getAllUsers: () => User[];
+  addUser: (user: Omit<User, "id">) => string;
+  removeUser: (id: string) => boolean;
+  updateUser: (id: string, data: Partial<User>) => boolean;
+  assignManager: (employeeId: string, managerId: string) => boolean;
+  resetDatabase: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Mock user data
-const mockUsers = [
+const initialMockUsers = [
   {
     id: '1',
     name: 'Employee User',
@@ -38,7 +48,12 @@ const mockUsers = [
     teamLeadId: '3',
     employeeId: 'EMP001',
     position: 'Software Developer',
-    phoneNumber: '123-456-7890'
+    phoneNumber: '123-456-7890',
+    location: {
+      lat: 40.7128,
+      lng: -74.006,
+      address: 'New York, NY'
+    }
   },
   {
     id: '2',
@@ -60,6 +75,7 @@ const mockUsers = [
 ];
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [mockUsers, setMockUsers] = useState([...initialMockUsers]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -101,12 +117,92 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     toast.info("You have been logged out");
   };
 
+  // Get all users (for HR management)
+  const getAllUsers = () => {
+    // Filter out sensitive data
+    return mockUsers.map(({ password, adminKey, ...user }) => user);
+  };
+
+  // Add a new user
+  const addUser = (userData: Omit<User, "id">) => {
+    const id = `${mockUsers.length + 1}`;
+    const newUser = {
+      id,
+      ...userData,
+      password: 'password123', // Default password
+      adminKey: userData.role === 'hr' ? 'hr-admin-key' : userData.role === 'teamlead' ? 'team-admin-key' : undefined
+    };
+    
+    setMockUsers([...mockUsers, newUser]);
+    return id;
+  };
+
+  // Remove a user
+  const removeUser = (id: string) => {
+    // Don't remove the current user
+    if (currentUser?.id === id) {
+      toast.error("Cannot remove your own account");
+      return false;
+    }
+
+    // Ensure we keep at least one HR user
+    const isHR = mockUsers.find(user => user.id === id)?.role === 'hr';
+    const hrCount = mockUsers.filter(user => user.role === 'hr').length;
+    
+    if (isHR && hrCount <= 1) {
+      toast.error("Cannot remove the last HR account");
+      return false;
+    }
+
+    setMockUsers(mockUsers.filter(user => user.id !== id));
+    return true;
+  };
+
+  // Update user data
+  const updateUser = (id: string, data: Partial<User>) => {
+    setMockUsers(
+      mockUsers.map(user => 
+        user.id === id ? { ...user, ...data } : user
+      )
+    );
+    
+    // Update current user if it's the same
+    if (currentUser?.id === id) {
+      setCurrentUser({...currentUser, ...data});
+    }
+    
+    return true;
+  };
+
+  // Assign manager to employee
+  const assignManager = (employeeId: string, managerId: string) => {
+    return updateUser(employeeId, { teamLeadId: managerId || undefined });
+  };
+
+  // Reset database (keep only HR accounts)
+  const resetDatabase = () => {
+    // Keep only HR users
+    const hrUsers = mockUsers.filter(user => user.role === 'hr');
+    setMockUsers(hrUsers);
+    
+    // If current user is not HR, log them out
+    if (currentUser && currentUser.role !== 'hr') {
+      logout();
+    }
+  };
+
   const value = {
     currentUser,
     login,
     logout,
     isAuthenticated: !!currentUser,
-    isLoading
+    isLoading,
+    getAllUsers,
+    addUser,
+    removeUser,
+    updateUser,
+    assignManager,
+    resetDatabase
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

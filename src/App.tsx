@@ -30,20 +30,41 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<Index />} />
               
-              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
-                <Route path="/teamlead-dashboard" element={<TeamLeadDashboard />} />
-                <Route path="/hr-dashboard" element={<HRDashboard />} />
-                <Route path="/profile" element={<Profile />} />
-                
-                {/* Adding nested routes for team lead dashboard */}
-                <Route path="/teamlead-dashboard/attendance" element={<TeamLeadDashboard />} />
-                <Route path="/teamlead-dashboard/reports" element={<TeamLeadDashboard />} />
-                
-                {/* Adding nested routes for HR dashboard */}
-                <Route path="/hr-dashboard/attendance" element={<HRDashboard />} />
-                <Route path="/hr-dashboard/approvals" element={<HRDashboard />} />
-                <Route path="/hr-dashboard/reports" element={<HRDashboard />} />
+              <Route path="/employee-dashboard" element={
+                <ProtectedRoute allowedRoles={["employee", "teamlead", "hr"]}>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<EmployeeDashboard />} />
+              </Route>
+              
+              <Route path="/teamlead-dashboard" element={
+                <ProtectedRoute allowedRoles={["teamlead", "hr"]}>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<TeamLeadDashboard />} />
+                <Route path="attendance" element={<TeamLeadDashboard />} />
+                <Route path="reports" element={<TeamLeadDashboard />} />
+              </Route>
+              
+              <Route path="/hr-dashboard" element={
+                <ProtectedRoute allowedRoles={["hr"]}>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<HRDashboard />} />
+                <Route path="attendance" element={<HRDashboard />} />
+                <Route path="approvals" element={<HRDashboard />} />
+                <Route path="reports" element={<HRDashboard />} />
+              </Route>
+              
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<Profile />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />

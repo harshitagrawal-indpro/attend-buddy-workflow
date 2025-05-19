@@ -1,5 +1,6 @@
 
 import { useAttendance } from "@/contexts/AttendanceContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { 
   Card, 
@@ -10,18 +11,24 @@ import {
 } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, PieChart, LineChart, UserRound, Clock, AlertCircle } from "lucide-react";
+import { BarChart, PieChart, LineChart, UserRound, Clock, AlertCircle, Users, MapPin, Cog } from "lucide-react";
 import AttendanceTable from "@/components/AttendanceTable";
 import AttendanceChart from "@/components/AttendanceChart";
 import { Input } from "@/components/ui/input";
+import LocationSelector from "@/components/LocationSelector";
+import EmployeeManagement from "@/components/EmployeeManagement";
+import DatabaseManagement from "@/components/DatabaseManagement";
+import { toast } from "sonner";
 
 const HRDashboard = () => {
   const { getAllRecords, getPendingRecords, updateAttendanceStatus } = useAttendance();
+  const { getAllUsers, addUser, removeUser, assignManager, resetDatabase, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [searchTerm, setSearchTerm] = useState("");
   
   const allRecords = getAllRecords();
   const pendingRecords = getPendingRecords();
+  const employees = getAllUsers();
 
   // Filter records by search term
   const filteredRecords = searchTerm
@@ -49,7 +56,18 @@ const HRDashboard = () => {
   ).size;
   
   const pendingApprovals = pendingRecords.length;
+
+  // Handle location selection
+  const handleLocationSelect = (employeeId: string, location: { lat: number; lng: number; address: string }) => {
+    updateUser(employeeId, { location });
+    toast.success("Location updated successfully");
+  };
   
+  // Handle database reset
+  const handleResetDatabase = () => {
+    resetDatabase();
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -96,10 +114,12 @@ const HRDashboard = () => {
       
       {/* Tabs */}
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 w-full max-w-md">
+        <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="overview">All Attendance</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="employees">Employee Management</TabsTrigger>
+          <TabsTrigger value="settings">System Settings</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4 mt-6">
@@ -183,9 +203,71 @@ const HRDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        
+        <TabsContent value="employees" className="space-y-4 mt-6">
+          <div className="grid grid-cols-1 gap-6">
+            <EmployeeManagement 
+              employees={employees}
+              onAddEmployee={(employee) => {
+                const id = addUser(employee);
+                return id;
+              }}
+              onRemoveEmployee={removeUser}
+              onAssignManager={assignManager}
+            />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <MapPin className="h-5 w-5 mr-2 text-brand-400" />
+                  Employee Locations
+                </CardTitle>
+                <CardDescription>Set and update employee work locations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium">Select Employee:</label>
+                    <select 
+                      className="border rounded-md px-3 py-2 bg-background"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const selectedEmployee = employees.find(emp => emp.id === e.target.value);
+                        if (selectedEmployee && e.target.value) {
+                          setSelectedEmployeeId(e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="" disabled>Select an employee</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name} ({emp.role})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {selectedEmployeeId && (
+                    <LocationSelector
+                      onLocationSelect={(location) => handleLocationSelect(selectedEmployeeId, location)}
+                      initialLocation={employees.find(emp => emp.id === selectedEmployeeId)?.location}
+                    />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="settings" className="space-y-4 mt-6">
+          <DatabaseManagement onResetDatabase={handleResetDatabase} />
+        </TabsContent>
       </Tabs>
     </div>
   );
 };
+
+// State for employee location selection
+const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
 
 export default HRDashboard;
