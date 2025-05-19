@@ -2,27 +2,14 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAttendance } from "@/contexts/AttendanceContext";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle, Clock, AlertCircle, MapPin } from "lucide-react";
 import { format } from "date-fns";
-import AttendanceTable from "@/components/AttendanceTable";
-import LocationSelector from "@/components/LocationSelector";
+import TodaysAttendanceCard from "@/components/dashboard/TodaysAttendanceCard";
+import LocationReasonDialog from "@/components/dashboard/LocationReasonDialog";
+import AttendanceHistoryCard from "@/components/dashboard/AttendanceHistoryCard";
 
 const EmployeeDashboard = () => {
   const { currentUser } = useAuth();
   const { todayRecord, markEntry, markExit, updateAttendanceReason, getEmployeeRecords, isLoading } = useAttendance();
-  const [showLocationPicker, setShowLocationPicker] = useState<'entry' | 'exit' | null>(null);
   const [showReasonDialog, setShowReasonDialog] = useState(false);
   const [reasonText, setReasonText] = useState('');
   
@@ -32,39 +19,8 @@ const EmployeeDashboard = () => {
   
   const employeeRecords = getEmployeeRecords(currentUser.employeeId || '');
   
-  // Calculate attendance stats
-  const totalWorkingDays = 22; // Assuming 22 working days in a month
-  const presentDays = employeeRecords.filter(record => 
-    record.status === 'approved' || record.status === 'half-day'
-  ).length;
-  const halfDays = employeeRecords.filter(record => record.status === 'half-day').length;
-  const absentDays = employeeRecords.filter(record => record.status === 'rejected').length;
-  const presentPercentage = Math.round((presentDays / totalWorkingDays) * 100);
-  
   // Get today's date
   const today = format(new Date(), "MMMM d, yyyy");
-
-  const handleLocationSelect = (location: { lat: number; lng: number; address: string }) => {
-    if (showLocationPicker === 'entry') {
-      markEntry({ lat: location.lat, lng: location.lng }).then((success) => {
-        setShowLocationPicker(null);
-        
-        // If location is not verified, show reason dialog
-        if (success && todayRecord && !todayRecord.locationVerified) {
-          setShowReasonDialog(true);
-        }
-      });
-    } else if (showLocationPicker === 'exit') {
-      markExit({ lat: location.lat, lng: location.lng }).then((success) => {
-        setShowLocationPicker(null);
-        
-        // If location is not verified, show reason dialog
-        if (success && todayRecord && !todayRecord.locationVerified && !todayRecord.locationReason) {
-          setShowReasonDialog(true);
-        }
-      });
-    }
-  };
 
   const handleReasonSubmit = () => {
     if (todayRecord && reasonText) {
@@ -82,190 +38,28 @@ const EmployeeDashboard = () => {
       </div>
       
       {/* Today's Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Today's Attendance</CardTitle>
-          <CardDescription>Mark your attendance for today</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-            <div className="w-full max-w-xs">
-              <div className="text-center sm:text-left mb-4">
-                <div className="text-sm text-muted-foreground mb-1">Current Status</div>
-                <div className="flex items-center justify-center sm:justify-start gap-2">
-                  {!todayRecord ? (
-                    <div className="flex items-center text-muted-foreground">
-                      <Clock className="mr-1 h-4 w-4" />
-                      <span>Not Marked</span>
-                    </div>
-                  ) : todayRecord.status === 'pending' ? (
-                    <div className="flex items-center text-yellow-500">
-                      <Clock className="mr-1 h-4 w-4" />
-                      <span>Pending</span>
-                    </div>
-                  ) : todayRecord.status === 'approved' ? (
-                    <div className="flex items-center text-green-500">
-                      <CheckCircle className="mr-1 h-4 w-4" />
-                      <span>Present</span>
-                    </div>
-                  ) : todayRecord.status === 'half-day' ? (
-                    <div className="flex items-center text-orange-500">
-                      <Clock className="mr-1 h-4 w-4" />
-                      <span>Half-day</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-red-500">
-                      <AlertCircle className="mr-1 h-4 w-4" />
-                      <span>Absent</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm text-muted-foreground mb-1">Entry Time</div>
-                  <div className="font-medium">{todayRecord?.entryTime || 'Not Marked'}</div>
-                </div>
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm text-muted-foreground mb-1">Exit Time</div>
-                  <div className="font-medium">{todayRecord?.exitTime || 'Not Marked'}</div>
-                </div>
-              </div>
-
-              {todayRecord && !todayRecord.locationVerified && (
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-start">
-                    <MapPin className="h-4 w-4 text-yellow-500 mt-0.5 mr-2" />
-                    <div>
-                      <p className="text-sm text-yellow-700 font-medium">Location not verified</p>
-                      <p className="text-xs text-yellow-600">
-                        {todayRecord.locationReason ? 
-                          `Reason provided: ${todayRecord.locationReason}` : 
-                          "You must be within 100 meters of the office to mark attendance normally."
-                        }
-                      </p>
-                      {!todayRecord.locationReason && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="mt-2" 
-                          onClick={() => setShowReasonDialog(true)}
-                        >
-                          Provide Reason
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex flex-col gap-3">
-                <Button 
-                  onClick={() => setShowLocationPicker('entry')} 
-                  disabled={isLoading || !!todayRecord?.entryTime}
-                  className="bg-brand-200 hover:bg-brand-300 text-black"
-                >
-                  <MapPin className="mr-2 h-4 w-4" />
-                  Mark Entry Time
-                </Button>
-                <Button 
-                  onClick={() => setShowLocationPicker('exit')} 
-                  disabled={isLoading || !todayRecord?.entryTime || !!todayRecord?.exitTime}
-                  className="bg-brand-300 hover:bg-brand-400 text-white"
-                >
-                  <MapPin className="mr-2 h-4 w-4" />
-                  Mark Exit Time
-                </Button>
-              </div>
-            </div>
-            
-            <div className="border-t sm:border-t-0 sm:border-l h-full w-full pt-6 sm:pt-0 sm:pl-6">
-              <h3 className="font-medium mb-4">Monthly Overview</h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span>Present</span>
-                    <span className="font-medium">{presentDays} days</span>
-                  </div>
-                  <Progress value={presentPercentage} className="h-2" />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="bg-muted p-3 rounded-lg">
-                    <div className="text-sm text-muted-foreground">Working Days</div>
-                    <div className="font-medium">{totalWorkingDays}</div>
-                  </div>
-                  <div className="bg-muted p-3 rounded-lg">
-                    <div className="text-sm text-muted-foreground">Half-days</div>
-                    <div className="font-medium">{halfDays}</div>
-                  </div>
-                  <div className="bg-muted p-3 rounded-lg">
-                    <div className="text-sm text-muted-foreground">Absent</div>
-                    <div className="font-medium">{absentDays}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Attendance History</CardTitle>
-          <CardDescription>View your past attendance records</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AttendanceTable records={employeeRecords.slice(0, 10)} />
-        </CardContent>
-        <CardFooter>
-          <div className="text-sm text-muted-foreground">
-            Showing the last 10 records
-          </div>
-        </CardFooter>
-      </Card>
-
-      {/* Location Picker Dialog */}
-      <Dialog open={showLocationPicker !== null} onOpenChange={(open) => !open && setShowLocationPicker(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {showLocationPicker === 'entry' ? 'Mark Entry Location' : 'Mark Exit Location'}
-            </DialogTitle>
-            <DialogDescription>
-              Select your current location to mark your {showLocationPicker === 'entry' ? 'entry' : 'exit'} time.
-              You must be within 100 meters of your office location.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <LocationSelector 
-              onLocationSelect={handleLocationSelect}
-              initialLocation={currentUser.location}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <div className="grid grid-cols-1 gap-y-6">
+        <TodaysAttendanceCard 
+          todayRecord={todayRecord}
+          isLoading={isLoading}
+          markEntry={markEntry}
+          markExit={markExit}
+          onShowReasonDialog={() => setShowReasonDialog(true)}
+          userLocation={currentUser.location}
+          employeeRecords={employeeRecords}
+        />
+        
+        <AttendanceHistoryCard records={employeeRecords} />
+      </div>
 
       {/* Reason Dialog */}
-      <Dialog open={showReasonDialog} onOpenChange={setShowReasonDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Provide Reason</DialogTitle>
-            <DialogDescription>
-              You were not within 100 meters of your office location. Please provide a reason.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <Textarea
-              placeholder="Enter your reason here..."
-              value={reasonText}
-              onChange={(e) => setReasonText(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <Button onClick={handleReasonSubmit} disabled={!reasonText.trim()}>Submit Reason</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <LocationReasonDialog 
+        open={showReasonDialog}
+        onOpenChange={setShowReasonDialog}
+        reasonText={reasonText}
+        setReasonText={setReasonText}
+        onSubmit={handleReasonSubmit}
+      />
     </div>
   );
 };
