@@ -1,4 +1,3 @@
-
 import { useAttendance } from "@/contexts/AttendanceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
@@ -25,6 +24,7 @@ const HRDashboard = () => {
   const { getAllUsers, addUser, removeUser, assignManager, resetDatabase, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   
   const allRecords = getAllRecords();
   const pendingRecords = getPendingRecords();

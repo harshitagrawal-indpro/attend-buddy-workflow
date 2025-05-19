@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { toast } from "sonner";
 
@@ -133,9 +132,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Add a new user
   const addUser = (userData: Omit<User, "id">) => {
     const id = `${mockUsers.length + 1}`;
+    const employeeId = userData.employeeId || `EMP${String(mockUsers.length + 1).padStart(3, '0')}`;
+    
     const newUser: InternalUser = {
       id,
       ...userData,
+      employeeId,
       password: 'password123', // Default password
     };
     
@@ -147,6 +149,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     setMockUsers([...mockUsers, newUser]);
+    toast.success(`Added new ${userData.role}: ${userData.name}`);
     return id;
   };
 
@@ -168,6 +171,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     setMockUsers(mockUsers.filter(user => user.id !== id));
+    toast.success("User removed successfully");
     return true;
   };
 
@@ -189,7 +193,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Assign manager to employee
   const assignManager = (employeeId: string, managerId: string) => {
-    return updateUser(employeeId, { teamLeadId: managerId || undefined });
+    const result = updateUser(employeeId, { teamLeadId: managerId || undefined });
+    if (result) {
+      const managerName = mockUsers.find(user => user.id === managerId)?.name || "No manager";
+      const employeeName = mockUsers.find(user => user.id === employeeId)?.name;
+      
+      if (managerId) {
+        toast.success(`Assigned ${employeeName} to manager: ${managerName}`);
+      } else {
+        toast.info(`Removed manager assignment for ${employeeName}`);
+      }
+    }
+    return result;
   };
 
   // Reset database (keep only HR accounts)
@@ -202,6 +217,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (currentUser && currentUser.role !== 'hr') {
       logout();
     }
+    
+    toast.success("Database has been reset successfully");
   };
 
   const value = {
