@@ -8,23 +8,23 @@ const Index = () => {
   const { isAuthenticated, currentUser } = useAuth();
   
   useEffect(() => {
-    if (isAuthenticated && currentUser) {
+    if (!isAuthenticated) {
+      navigate('/login');
+    } else {
       // Redirect based on user role
-      switch (currentUser.role) {
+      switch (currentUser?.role) {
         case 'employee':
-          navigate('/employee-dashboard', { replace: true });
+          navigate('/employee-dashboard');
           break;
         case 'teamlead':
-          navigate('/teamlead-dashboard', { replace: true });
+          navigate('/teamlead-dashboard');
           break;
         case 'hr':
-          navigate('/hr-dashboard', { replace: true });
+          navigate('/hr-dashboard');
           break;
         default:
-          navigate('/login', { replace: true });
+          navigate('/login');
       }
-    } else {
-      navigate('/login', { replace: true });
     }
   }, [navigate, isAuthenticated, currentUser]);
   

@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { toast } from "sonner";
 
@@ -15,49 +15,22 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   teamId: string | null;
   notes: string | null;
-  entryLocation?: {
-    lat: number;
-    lng: number;
-  };
-  exitLocation?: {
-    lat: number;
-    lng: number;
-  };
-  locationVerified?: boolean;
-  locationReason?: string;
 }
 
 interface AttendanceContextType {
   attendanceRecords: AttendanceRecord[];
   todayRecord: AttendanceRecord | null;
-  markEntry: (currentLocation?: { lat: number; lng: number }) => Promise<boolean>;
-  markExit: (currentLocation?: { lat: number; lng: number }) => Promise<boolean>;
+  markEntry: () => void;
+  markExit: () => void;
   updateAttendanceStatus: (recordId: string, status: AttendanceStatus, notes?: string) => void;
   getEmployeeRecords: (employeeId: string) => AttendanceRecord[];
   getTeamRecords: (teamId: string) => AttendanceRecord[];
   getAllRecords: () => AttendanceRecord[];
   getPendingRecords: () => AttendanceRecord[];
-  updateAttendanceReason: (recordId: string, reason: string) => void;
   isLoading: boolean;
 }
 
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
-
-// Function to calculate distance between two coordinates in meters
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-           Math.cos(φ1) * Math.cos(φ2) *
-           Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distance in meters
-};
 
 // Generate mock data for the last 30 days
 const generateMockAttendanceData = (): AttendanceRecord[] => {
@@ -65,11 +38,11 @@ const generateMockAttendanceData = (): AttendanceRecord[] => {
   
   // Mock employees
   const employees = [
-    { id: 'EMP001', name: 'Employee User', teamId: 'team1', location: { lat: 40.7128, lng: -74.006 } },
-    { id: 'EMP002', name: 'John Doe', teamId: 'team1', location: { lat: 40.7178, lng: -74.016 } },
-    { id: 'EMP003', name: 'Jane Smith', teamId: 'team1', location: { lat: 40.7148, lng: -74.009 } },
-    { id: 'EMP004', name: 'Mike Johnson', teamId: 'team2', location: { lat: 40.7238, lng: -74.002 } },
-    { id: 'EMP005', name: 'Sara Williams', teamId: 'team2', location: { lat: 40.7198, lng: -73.998 } }
+    { id: 'EMP001', name: 'Employee User', teamId: 'team1' },
+    { id: 'EMP002', name: 'John Doe', teamId: 'team1' },
+    { id: 'EMP003', name: 'Jane Smith', teamId: 'team1' },
+    { id: 'EMP004', name: 'Mike Johnson', teamId: 'team2' },
+    { id: 'EMP005', name: 'Sara Williams', teamId: 'team2' }
   ];
   
   const today = new Date();
@@ -108,17 +81,6 @@ const generateMockAttendanceData = (): AttendanceRecord[] => {
         const statuses: AttendanceStatus[] = ['approved', 'approved', 'approved', 'half-day', 'rejected'];
         status = statuses[Math.floor(Math.random() * statuses.length)];
       }
-
-      // Add small random variation to location for entry and exit
-      const entryLocation = {
-        lat: employee.location.lat + (Math.random() * 0.001 - 0.0005),
-        lng: employee.location.lng + (Math.random() * 0.001 - 0.0005),
-      };
-
-      const exitLocation = {
-        lat: employee.location.lat + (Math.random() * 0.001 - 0.0005),
-        lng: employee.location.lng + (Math.random() * 0.001 - 0.0005),
-      };
       
       records.push({
         id: `att-${dateString}-${employee.id}`,
@@ -129,10 +91,7 @@ const generateMockAttendanceData = (): AttendanceRecord[] => {
         exitTime,
         status,
         teamId: employee.teamId,
-        notes: null,
-        entryLocation: !isToday ? entryLocation : undefined,
-        exitLocation: !isToday ? exitLocation : undefined,
-        locationVerified: !isToday ? true : undefined,
+        notes: null
       });
     });
   }
@@ -152,36 +111,19 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
       record.date === new Date().toISOString().split('T')[0]
   ) || null : null;
   
-  // Mark entry time with location verification
-  const markEntry = async (currentLocation?: { lat: number; lng: number }): Promise<boolean> => {
+  // Mark entry time
+  const markEntry = () => {
     if (!currentUser || !currentUser.employeeId) {
       toast.error("User information is incomplete");
-      return false;
-    }
-
-    // Check if location is provided
-    if (!currentLocation) {
-      toast.error("Location information is required");
-      return false;
+      return;
     }
     
     setIsLoading(true);
     
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+    setTimeout(() => {
       const today = new Date().toISOString().split('T')[0];
       const currentTime = new Date();
       const timeString = `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`;
-      
-      // Verify if within 100 meters of office location
-      const isWithinRange = currentUser.location ? 
-        calculateDistance(
-          currentLocation.lat, 
-          currentLocation.lng, 
-          currentUser.location.lat, 
-          currentUser.location.lng
-        ) <= 100 : false;
       
       // Check if a record for today already exists
       const existingRecord = attendanceRecords.find(
@@ -193,13 +135,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         setAttendanceRecords(prev => 
           prev.map(record => 
             record.id === existingRecord.id
-              ? { 
-                  ...record, 
-                  entryTime: timeString,
-                  entryLocation: currentLocation,
-                  locationVerified: isWithinRange,
-                  status: isWithinRange ? 'pending' : 'half-day',
-                }
+              ? { ...record, entryTime: timeString }
               : record
           )
         );
@@ -212,61 +148,32 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
           date: today,
           entryTime: timeString,
           exitTime: null,
-          status: isWithinRange ? 'pending' : 'half-day',
+          status: 'pending',
           teamId: currentUser.teamId || null,
-          notes: null,
-          entryLocation: currentLocation,
-          locationVerified: isWithinRange,
+          notes: null
         };
         
         setAttendanceRecords(prev => [...prev, newRecord]);
       }
       
-      if (isWithinRange) {
-        toast.success("Entry time recorded successfully");
-      } else {
-        toast.warning("Entry recorded, but you're not at the office location. Please provide a reason.");
-      }
-      
-      return true;
-    } catch (error) {
-      toast.error("Failed to record entry time");
-      return false;
-    } finally {
+      toast.success("Entry time recorded successfully");
       setIsLoading(false);
-    }
+    }, 1000);
   };
   
-  // Mark exit time with location verification
-  const markExit = async (currentLocation?: { lat: number; lng: number }): Promise<boolean> => {
+  // Mark exit time
+  const markExit = () => {
     if (!currentUser || !currentUser.employeeId) {
       toast.error("User information is incomplete");
-      return false;
-    }
-
-    // Check if location is provided
-    if (!currentLocation) {
-      toast.error("Location information is required");
-      return false;
+      return;
     }
     
     setIsLoading(true);
     
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+    setTimeout(() => {
       const today = new Date().toISOString().split('T')[0];
       const currentTime = new Date();
       const timeString = `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`;
-      
-      // Verify if within 100 meters of office location
-      const isWithinRange = currentUser.location ? 
-        calculateDistance(
-          currentLocation.lat, 
-          currentLocation.lng, 
-          currentUser.location.lat, 
-          currentUser.location.lng
-        ) <= 100 : false;
       
       // Find today's record
       const existingRecord = attendanceRecords.find(
@@ -278,34 +185,17 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         setAttendanceRecords(prev => 
           prev.map(record => 
             record.id === existingRecord.id
-              ? { 
-                  ...record, 
-                  exitTime: timeString,
-                  exitLocation: currentLocation,
-                  locationVerified: record.locationVerified && isWithinRange,
-                  status: record.locationVerified && isWithinRange ? record.status : 'half-day',
-                }
+              ? { ...record, exitTime: timeString }
               : record
           )
         );
-        
-        if (isWithinRange) {
-          toast.success("Exit time recorded successfully");
-        } else {
-          toast.warning("Exit recorded, but you're not at the office location. Please provide a reason.");
-        }
-        
-        return true;
+        toast.success("Exit time recorded successfully");
       } else {
         toast.error("No entry record found for today");
-        return false;
       }
-    } catch (error) {
-      toast.error("Failed to record exit time");
-      return false;
-    } finally {
+      
       setIsLoading(false);
-    }
+    }, 1000);
   };
   
   // Update attendance status (for Team Lead and HR)
@@ -322,24 +212,6 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
       );
       
       toast.success(`Attendance status updated to ${status}`);
-      setIsLoading(false);
-    }, 1000);
-  };
-
-  // Update attendance reason for location mismatch
-  const updateAttendanceReason = (recordId: string, reason: string) => {
-    setIsLoading(true);
-    
-    setTimeout(() => {
-      setAttendanceRecords(prev => 
-        prev.map(record => 
-          record.id === recordId
-            ? { ...record, locationReason: reason }
-            : record
-        )
-      );
-      
-      toast.success("Reason submitted successfully");
       setIsLoading(false);
     }, 1000);
   };
@@ -382,7 +254,6 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     getTeamRecords,
     getAllRecords,
     getPendingRecords,
-    updateAttendanceReason,
     isLoading
   };
 
